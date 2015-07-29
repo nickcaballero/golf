@@ -11,3 +11,6 @@ urigo:angular
 angularui:angular-ui-router
 rwatts:uuid
 twbs:bootstrap
+angular:angular-sanitize
+golf
+editor

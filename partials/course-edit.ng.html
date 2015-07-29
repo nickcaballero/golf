@@ -1,0 +1,53 @@
+<div class="container">
+    <header>
+        <h1 ng-bind="course._id ? 'Edit Course' : 'Create Course'"></h1>
+        <h3 ng-bind="course.name || 'Enter name'"></h3>
+    </header>
+
+    <form novalidate>
+        <div class="col-md-12">
+            <div class="row">
+                <div class="col-md-12">
+                    <label>Name</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-md-12">
+                    <input type="text" class="form-control" ng-model="course.name" placeholder="Pax" required />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <label>Description</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-md-12">
+                    <input type="textarea" class="form-control" ng-model="course.description" placeholder="Pax Romana" required/>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <label>Runtime</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-md-12">
+                    <div ui-ace="{
+                                  mode: 'javascript',
+                                  advanced: {
+                                      enableBasicAutocompletion: true,
+                                      enableLiveAutocompletion: true
+                                  }
+                                }" ng-model="course.runtime"></div>
+                </div>
+            </div>
+        </div>
+        <hr />
+        <div class="pull-right">
+            <button ng-click="save()" type="submit" class="btn btn-primary"><span class="glyphicon glyphicon-save" aria-hidden="true"></span> Save</button>
+            <button ng-if="course._id" ng-click="remove()" type="button" class="btn btn-danger"><span class="glyphicon glyphicon-trash" aria-hidden="true"></span> Remove</button>
+            <a ui-sref="courses">Back to course list</a>
+        </div>
+    </form>
+</div>
