@@ -14,3 +14,5 @@ twbs:bootstrap
 angular:angular-sanitize
 golf
 editor
+testing
+angularui:angular-ui-bootstrap

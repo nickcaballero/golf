@@ -1,26 +1,31 @@
 <div class="container">
-    <header>
-        <h1>{{course.name}}</h1>
-    </header>
+    <div ng-include="'partials/navbar.ng.html'"></div>
+    <ol class="breadcrumb">
+        <li><a ui-sref="courses">Courses</a></li>
+        <li class="active">{{course.name}}</li>
+    </ol>
+    <h2>{{course.name}} <small class="pull-right"><a ui-sref="courseEdit({id: course._id})">Edit course</a></small></h2>
     <div ng-bind-html="course.description"></div>
-    <div ui-ace="{
-                  mode: 'javascript',
-                }" readonly ng-model="course.runtime"></div>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th style="width: 1%;">
-                    <!--Actions-->
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr ng-repeat="submission in submissions">
-                <td>{{submission.user.username}}</td>
-                <td></td>
-            </tr>
-        </tbody>
-    </table>
-    <a ui-sref="submissionEdit({id: 'new'})" class="btn btn-success pull-right" role="button"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span> New Submission</a>
+    <div ui-ace="{mode: 'javascript', theme:'solarized_dark'}" readonly ng-model="course.runtime"></div>
+    <h3>Submissions <small class="pull-right"><a ui-sref="submissionEdit({id: 'new', courseId: course._id})" role="button">Add a solution</a></small></h3>
+    <hr />
+    <div ng-repeat="submission in submissions">
+        <h4>{{submission.name}} <small class="pull-right"><a ui-sref="submissionEdit({id: submission._id, courseId: course._id})">Edit submission</a></small></h4>
+        <div class="row">
+            <div class="col-md-4">
+                <p ng-bind-html="submission.description"></p>
+            </div>
+            <div class="col-md-8">
+                <tabset justified="true" type="pills">
+                    <tab heading="Code">
+                        <div ui-ace="{mode: 'javascript', useWrapMode : true, theme:'solarized_dark'}" readonly ng-model="submission.code"></div>
+                    </tab>
+                    <tab heading="Minified">
+                        <div ui-ace="{mode: 'javascript', useWrapMode : true, theme:'solarized_dark'}" readonly ng-model="submission.minified"></div>
+                    </tab>
+                </tabset>
+            </div>
+        </div>
+        <hr ng-show="!$last" />
+    </div>
 </div>

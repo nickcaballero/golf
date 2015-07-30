@@ -1,0 +1,79 @@
+<div class="container">
+    <div ng-include="'partials/navbar.ng.html'"></div>
+    <ol class="breadcrumb">
+        <li><a ui-sref="courses">Courses</a></li>
+        <li><a ui-sref="courseView({id: submission.courseId})">{{course.name}}</a></li>
+        <li class="active" ng-bind="submission.name || 'Enter name'"></li>
+    </ol>
+
+    <form novalidate>
+        <div class="col-md-12">
+            <div class="row">
+                <div class="col-md-12">
+                    <label>Name</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-md-12">
+                    <input type="text" class="form-control" ng-model="submission.name" placeholder="Epic" required />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <label>Description</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-md-12">
+                    <input type="textarea" class="form-control" ng-model="submission.description" placeholder="If a listener nods his head when you’re explaining your program, wake him up. - Alan J. Perlis" required/>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <label>Parameters</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-md-12">
+                    <input type="text" class="form-control" ng-model="submission.parameters" ng-attr-placeholder="{{course.parameters || 'input'}}" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <label>Code</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-md-12">
+                    <div ui-ace="{
+                                  mode: 'javascript',
+                                  advanced: {
+                                      enableBasicAutocompletion: true
+                                  }
+                                }" ng-model="submission.code"></div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-md-12">
+                    <div class="list-group">
+                        <div class="list-group-item list-group-item-danger" ng-repeat="failure in validation.failures">
+                            <h4 class="list-group-item-heading">{{failure.fullTitle}}</h4>
+                            <div class="list-group-item-text">
+                                <p>{{failure.err.message}}</p>
+                                <pre ng-bind="failure.err.stack"></pre>
+                            </div>
+                        </div>
+                        <div class="list-group-item list-group-item-success" ng-repeat="pass in validation.passes">
+                            {{pass.fullTitle}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr />
+        <div class="pull-right">
+            <button ng-click="save()" type="submit" class="btn btn-primary"><span class="glyphicon glyphicon-save" aria-hidden="true"></span> Save</button>
+            <button ng-if="submission._id" ng-click="remove()" type="button" class="btn btn-danger"><span class="glyphicon glyphicon-trash" aria-hidden="true"></span> Remove</button>
+        </div>
+    </form>
+</div>

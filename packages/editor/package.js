@@ -4,7 +4,8 @@ Package.describe({
 
 Npm.depends({
     'angular-ui-ace': '0.2.3',
-    'brace': '0.5.1'
+    'brace': '0.5.1',
+    'uglify-js': '2.4.24'
 });
 
 Package.onUse(function(api) {
