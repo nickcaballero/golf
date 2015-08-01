@@ -1,10 +1,14 @@
+var global = this;
+
 Mocha.process.stdout.write = function() {
     console.log('stdout', arguments);
 };
 
-var global = this;
-this.makeMochaInstance = function() {
+Mocha.Runner.immediately = function(fn) {
+    setTimeout(fn, 0);
+};
 
+global.makeMochaInstance = function() {
     var mochaInstance = new Mocha({
         reporter: 'html'
     });
@@ -75,6 +79,4 @@ this.makeMochaInstance = function() {
     };
 
     return mochaInstance;
-}
-
-global.chai = chai;
+};

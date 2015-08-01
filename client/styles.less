@@ -1,0 +1,171 @@
+@color-success: #449d44;
+@color-danger: #d9534f;
+@color-info: #31b0d5;
+@panel-background-color: #333;
+@panel-border-color: #111;
+@background-color: #444;
+@text-color: #ececec;
+@navbar-background-color: @panel-background-color;
+@navbar-color: @text-color;
+.shadow(@blur: 5px, @spread: 1px, @color: rgba(0, 0, 0, .2)) {
+    -webkit-box-shadow: 0 0 @blur @spread @color;
+    box-shadow: 0 0 @blur @spread @color;
+}
+
+body {
+    background-color: @background-color;
+    color: @text-color;
+}
+
+hr {
+    border-color: #999;
+}
+
+.ace_editor {
+    min-height: 50px;
+    margin-top: 10px;
+}
+
+golf-results .progress {
+    display: none;
+}
+
+golf-results h1 {
+    font-size: 1.2em;
+    margin: 0;
+    padding: 0;
+}
+
+golf-results h2 {
+    font-size: 1.1em;
+    margin: 0;
+    padding: 0;
+}
+
+golf-results .replay {
+    display: none;
+}
+
+.btn {
+    border: #222 solid 1px;
+}
+
+.btn-success {
+    background-color: @color-success;
+}
+
+.btn-info {
+    background-color: @color-info;
+}
+
+.btn-default {
+    background-color: @background-color;
+    color: @text-color;
+}
+
+.navbar {
+    .shadow();
+}
+
+.navbar-default {
+    background-color: @navbar-background-color;
+    border-color: @panel-border-color;
+    color: #333;
+    .navbar-brand, .navbar-nav > li > a {
+        color: @navbar-color;
+    }
+}
+
+.breadcrumb {
+    background-color: @panel-background-color;
+    border: @panel-border-color solid 1px;
+    .shadow();
+}
+
+.panel {
+    //border-radius: 0;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+}
+
+.panel-body {
+    background-color: @background-color;
+}
+
+.panel-default,
+.panel-success,
+.panel-danger {
+    & > .panel-heading {
+        background-color: @panel-background-color;
+        border-color: @panel-border-color;
+        color: @text-color;
+    }
+}
+
+.panel-style(@color) {
+    border-color: @color;
+    .shadow(@color: fade(darken(@color, 20%), 70%));
+    & > .panel-heading {
+        border-color: fade(@color, 50%);
+    }
+}
+
+.panel-default {
+    .shadow();
+}
+
+.panel-success {
+    .panel-style(@color-success);
+}
+
+.panel-danger {
+    .panel-style(@color-danger);
+}
+
+.panel-heading {
+    border-radius: 0;
+}
+
+.panel-footer {
+    border-top: 1px solid #111;
+    background-color: #333;
+    border-radius: 0;
+}
+
+.panel-default {
+    border-color: #111;
+}
+
+.modal-content {
+    .panel();
+    .panel-body();
+    .shadow();
+    &, .modal-header, .modal-footer {
+        border-color: #111;
+        background-color: @panel-background-color;
+    }
+    
+    .modal-body {
+        background-color: @background-color;
+    }
+}
+
+.list-group-item {
+    border-color: @panel-border-color;
+    &:first-child, &:last-child {
+        border-radius: 0;
+    }
+}
+
+.list-group-item-style(@color) {
+    background-color: fade(darken(@color, 20%), 50%);
+    color: @text-color;
+}
+
+.list-group-item-success {
+    .list-group-item-style(@color-success);
+}
+
+.list-group-item-danger {
+    .list-group-item-style(@color-danger);
+}

@@ -1,9 +1,15 @@
+function opWrapper(callback, object) {
+    return _.wrap(callback || lodash.noop, function(fn, error, _id) {
+        if (error)
+            alert('Failed to save');
+        fn(object);
+    });
+}
+
 // Helper function to remove object with a prompt
 function basicRemove(collection, object, callback) {
     if (confirm('Are you sure?')) {
-        collection.remove(object._id);
-        if (_.isFunction(callback))
-            callback(object);
+        collection.remove(object._id, opWrapper(callback, object));
         return true;
     }
     return false;
@@ -11,13 +17,14 @@ function basicRemove(collection, object, callback) {
 
 // helper function to save object
 function basicSave(object, collection, callback) {
+    callback = opWrapper(callback, object);
+
     var payload = _.omit(object, _.isFunction);
     if (object._id)
-        collection.update(object._id, object);
+        collection.update(object._id, object, callback);
     else
-        collection.insert(payload);
-    if (_.isFunction(callback))
-        callback(object);
+        collection.insert(payload, callback);
+
 }
 
 function getId($stateParams, param) {
@@ -75,41 +82,91 @@ function cleanupCourse(course) {
     });
 }
 
-// Setup the application
-var golfApp = angular.module('golfApp', [
-    'angular-meteor', 'ui.bootstrap', 'ui.router', 'courseCtrls', 'ngSanitize', 'ui.ace'
-]);
+function getParameters(object, def) {
+    return (object.parameters || (def || '')).trim().split(',');
+}
 
-// Configure router
-golfApp.config(['$urlRouterProvider', '$stateProvider', '$locationProvider',
-    function($urlRouterProvider, $stateProvider, $locationProvider) {
-        $stateProvider.
+function fnParams(submission, course) {
+    var params = getParameters(submission);
+    return params.length ? params : getParameters(course, 'input');
+}
 
-        state('courses', {
-            url: '/courses',
-            templateUrl: 'partials/course-list.ng.html',
-            controller: 'CourseList'
-        }).
-        state('courseEdit', {
-            url: '/courses/{id}/edit',
-            templateUrl: 'partials/course-edit.ng.html',
-            controller: 'CourseEdit'
-        }).
-        state('courseView', {
-            url: '/courses/{id}',
-            templateUrl: 'partials/course-view.ng.html',
-            controller: 'CourseView'
-        }).
+function aceConfig(lines) {
+    return {
+        mode: 'javascript',
+        theme: 'idle_fingers',
+        advanced: {
+            enableBasicAutocompletion: true,
+            maxLines: lines || 20
+        },
+        onLoad: function(editor) {
+            editor.$blockScrolling = Infinity;
+        }
+    };
+}
 
-        state('submissionEdit', {
-            url: '/courses/{courseId}/submissions/{id}/edit',
-            templateUrl: 'partials/submission-edit.ng.html',
-            controller: 'SubmissionEdit'
-        });
-
-        $urlRouterProvider.otherwise('/courses');
+function beautifyCode(code) {
+    try {
+        return beautify(code);
     }
-]);
+    catch (e) {
+        console.error(e);
+    }
+    return code;
+}
+
+function testSubmission(submission, course, fn) {
+    var instance = makeMochaInstance();
+    instance.setup({
+        reporter: "json",
+        ui: "bdd"
+    });
+
+    var localParams = _.partial(fnParams, submission, course);
+
+    function asFunction() {
+        var params = localParams();
+        var header = 'var _ = lodash;';
+        params.push(header + submission.code);
+        return Function.apply({}, params);
+    }
+
+    var api = instance.api;
+    api.describe('submission', function() {
+        api.it('is compatible', function() {
+            chai.expect(localParams().length).to.be.equal(getParameters(course).length || 1)
+        });
+        api.it('compiles', function() {
+            var fn = asFunction();
+            chai.expect(fn).to.be.a('function');
+        });
+    });
+
+    try {
+        var courseRuntime = new Function('bdd', 'chai', 'fn', course.runtime);
+        courseRuntime.call({}, instance.api, chai, asFunction());
+    }
+    catch (e) {
+        console.error(e);
+    }
+
+    instance.jsRun(function(js) {
+        fn(js);
+    });
+}
+
+Accounts.ui.config({
+    passwordSignupFields: 'USERNAME_AND_EMAIL'
+});
+
+var courses = Meteor.subscribe('courses');
+var submissions = Meteor.subscribe('submissions');
+
+var generalCtrls = angular.module('generalCtrls', []);
+
+generalCtrls.controller('Login', ['$scope', function($scope) {
+
+}]);
 
 var courseCtrls = angular.module('courseCtrls', []);
 
@@ -123,16 +180,24 @@ courseCtrls.controller('CourseList', ['$scope', function($scope) {
 
 // Edit and create the courses
 courseCtrls.controller('CourseEdit', ['$scope', '$stateParams', '$state', withCollectionObject(getCourse, function($scope, $stateParams, $state, course) {
-    var toCourses = function() {
-        $state.go('courses');
+    var toCourses = function(course) {
+        if (course._id)
+            $state.go('courseView', {
+                id: course._id
+            });
+        else
+            $state.go('courses');
     };
 
+    $scope.aceConfig = aceConfig(Infinity);
     $scope.course = course;
-    $scope.validation = '';
-    $scope.save = _.bind(basicSave, this, course, Courses, toCourses);
+    $scope.save = _.wrap(_.bind(basicSave, this, course, Courses, toCourses), function(fn) {
+        course.runtime = beautifyCode(course.runtime);
+        return fn();
+    });
     $scope.remove = _.bind(basicRemove, this, Courses, course, _.wrap(toCourses, function(fn) {
         cleanupCourse(course);
-        fn();
+        return fn();
     }));
 
     var instance = makeMochaInstance();
@@ -153,40 +218,102 @@ courseCtrls.controller('CourseEdit', ['$scope', '$stateParams', '$state', withCo
         return course.runtime;
     }, function() {
         instance.jsRun(function(js) {
-            $scope.validation = js;
+            $scope.$apply(function() {
+                $scope.validation = js;
+                console.log(js);
+            });
         });
     });
 })]);
 
+courseCtrls.controller('CourseSubmissionTest', ['$scope', '$modalInstance', function($scope, $modalInstance) {
+    $scope.ok = function() {
+        $modalInstance.close();
+    };
+}]);
+
+function isLoggedIn($scope) {
+    return $scope.currentUser != null;
+}
+
+function loginPrompt() {
+    $('#login-dropdown-list').addClass('open');
+    $('html,body').animate({ scrollTop: 0 }, 'slow');
+}
+
 // Course view
-courseCtrls.controller('CourseView', ['$scope', '$stateParams', '$state', withCollectionObject(getCourse, function($scope, $stateParams, $state, course) {
+courseCtrls.controller('CourseView', ['$scope', '$stateParams', '$state', '$modal', withCollectionObject(getCourse, function($scope, $stateParams, $state, $modal, course) {
+
+    $scope.aceConfigWrap = _.extend(aceConfig(Infinity), {
+        useWrapMode: true,
+        showGutter: false
+    });
     $scope.course = course;
+
+    $scope.canEditCourse = _.partial(isLoggedIn, $scope);
+    $scope.canEditSubmission = _.partial(isLoggedIn, $scope);
+    $scope.loginPrompt = _.partial(_.defer, loginPrompt);
+
+    $scope.toggleMode = function(submission) {
+        var code = 'function code(' + fnParams(submission, course).join() + ") {\n" + submission.code + "\n}";
+        switch (submission.displayMode) {
+            case 'minified':
+                submission.displayMode = 'code';
+                submission.displayCode = beautifyCode(code);
+                break;
+            case 'code':
+            default:
+                submission.displayMode = 'minified';
+                submission.displayCode = (uglify.minify(code, {
+                    fromString: true
+                }) || {}).code;
+                break;
+        }
+    };
+    
+    $scope.modeLabel = function(submission) {
+        return submission.displayMode == 'code' ? 'Show minified' : 'Show code';
+    };
+
+    $scope.testSubmission = function(submission) {
+        if (!confirm('You trust it?'))
+            return;
+
+        testSubmission(submission, course, function(js) {
+            $scope.$apply(function() {
+                var childScope = $scope.$new(true, $scope);
+                childScope.validation = js;
+                childScope.submission = submission;
+                $modal.open({
+                    animation: false,
+                    scope: childScope,
+                    controller: 'CourseSubmissionTest',
+                    templateUrl: 'courseView.testResults.html',
+                });
+            })
+        });
+    };
+
     $scope.submissions = $scope.$meteorCollection(function() {
         return Submissions.find({
             courseId: course._id
         });
+    }, false);
+    $scope.submissions.forEach(function(o) {
+        o.displayMode = 'minified';
+        $scope.toggleMode(o);
     });
-    $scope.submissions.forEach(function(submission) {
-        try {
-            submission.minified = (uglify.minify('function code() {' + submission.code + '};', {
-                fromString: true
-            }) || {}).code;
-        }
-        catch (e) {
-            console.error(e);
-        }
-    });
+
     $scope.remove = _.partial(basicRemove, Submissions);
+    $scope.fnParams = function(submission) {
+        return fnParams(submission, course);
+    };
 })]);
 
-function getParameters(object, def) {
-    return (object.parameters || (def || '')).trim().split(',');
-}
-
 // Edit and create the submissions
-courseCtrls.controller('SubmissionEdit', ['$scope', '$stateParams', '$state',
+courseCtrls.controller('SubmissionEdit', ['$scope', '$stateParams', '$state', 'currentUser',
     withCollectionObject(getCourse,
-        withCollectionObject(getSubmission, function($scope, $stateParams, $state, course, submission) {
+        withCollectionObject(getSubmission, function($scope, $stateParams, $state, currentUser, course, submission) {
             var toCourse = function() {
                 $state.go('courseView', {
                     id: course._id
@@ -195,21 +322,14 @@ courseCtrls.controller('SubmissionEdit', ['$scope', '$stateParams', '$state',
 
             submission.courseId = course._id;
 
+            $scope.aceConfig = aceConfig(Infinity);
             $scope.course = course;
             $scope.submission = submission;
-            $scope.save = _.bind(basicSave, this, submission, Submissions, toCourse);
+            $scope.save = _.wrap(_.bind(basicSave, this, submission, Submissions, toCourse), function(fn) {
+                submission.code = beautifyCode(submission.code);
+                return fn();
+            });
             $scope.remove = _.bind(basicRemove, this, Submissions, submission, toCourse);
-
-            function fnParams() {
-                var params = getParameters(submission);
-                return params.length ? params : getParameters(course, 'input');
-            }
-
-            function asFunction() {
-                var params = fnParams();
-                params.push(submission.code);
-                return Function.apply({}, params);
-            }
 
             var courseRuntime = new Function('bdd', 'chai', 'fn', course.runtime);
 
@@ -220,36 +340,81 @@ courseCtrls.controller('SubmissionEdit', ['$scope', '$stateParams', '$state',
             }, function() {
                 return course.parameters;
             }], function() {
-                var instance = makeMochaInstance();
-                instance.setup({
-                    reporter: "json",
-                    ui: "bdd"
-                });
-
-                var api = instance.api;
-                api.describe('Submission', function() {
-                    api.it('is compatible', function() {
-                        chai.expect(fnParams().length).to.be.equal(getParameters(course).length || 1)
-                    });
-                    api.it('compiles', function() {
-                        var fn = asFunction();
-                        chai.expect(fn).to.be.a('function');
-                    });
-                });
-
-                try {
-                    courseRuntime.call({}, instance.api, chai, asFunction());
-                }
-                catch (e) {
-                    console.error(e);
-                }
-
-                instance.jsRun(function(js) {
+                testSubmission(submission, course, function(js) {
                     $scope.$apply(function() {
                         $scope.validation = js;
-                        console.log(js);
+                        $scope.submission.valid = !js.failures.length;
                     });
                 });
             });
         }), 'courseId')
+]);
+
+// Setup the application
+var golfApp = angular.module('golfApp', [
+    'angular-meteor', 'ui.bootstrap', 'ui.router', 'courseCtrls', 'generalCtrls', 'ngSanitize', 'ui.ace'
+]);
+
+
+// Configure error handling
+golfApp.run(["$rootScope", "$state", function($rootScope, $state) {
+    $rootScope.$on("$stateChangeError", function(event, toState, toParams, fromState, fromParams, error) {
+        if (error === "AUTH_REQUIRED")
+            loginPrompt();
+        else
+            console.error('Failed to change state', arguments);
+    });
+}]);
+
+
+
+// Configure router
+golfApp.config(['$urlRouterProvider', '$stateProvider', '$locationProvider', '$provide',
+    function($urlRouterProvider, $stateProvider, $locationProvider, $provide) {
+
+        $provide.decorator('meteorIncludeDirective', function($delegate) {
+            var directive = $delegate[0];
+            return $delegate;
+        });
+
+        var authResolve = {
+            "currentUser": ["$meteor", function($meteor) {
+                return $meteor.requireUser();
+            }]
+        };
+
+        $stateProvider.
+
+        state('login', {
+            url: '/login',
+            templateUrl: 'partials/login.ng.html',
+            controller: 'Login'
+        }).
+
+        state('courses', {
+            url: '/courses',
+            templateUrl: 'partials/course-list.ng.html',
+            controller: 'CourseList'
+        }).
+        state('courseEdit', {
+            url: '/courses/{id}/edit',
+            templateUrl: 'partials/course-edit.ng.html',
+            controller: 'CourseEdit',
+            resolve: authResolve
+        }).
+        state('courseView', {
+            url: '/courses/{id}',
+            templateUrl: 'partials/course-view.ng.html',
+            controller: 'CourseView'
+        }).
+
+        state('submissionEdit', {
+            url: '/courses/{courseId}/submissions/{id}/edit',
+            templateUrl: 'partials/submission-edit.ng.html',
+            controller: 'SubmissionEdit',
+            resolve: authResolve
+        });
+
+        $urlRouterProvider.otherwise('/courses');
+    }
 ]);

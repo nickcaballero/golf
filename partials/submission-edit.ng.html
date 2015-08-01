@@ -45,12 +45,7 @@
             </div>
             <div class="row">
                 <div class="form-group col-md-12">
-                    <div ui-ace="{
-                                  mode: 'javascript',
-                                  advanced: {
-                                      enableBasicAutocompletion: true
-                                  }
-                                }" ng-model="submission.code"></div>
+                    <div ui-ace="aceConfig" ng-model="submission.code"></div>
                 </div>
             </div>
             <div class="row">
