@@ -15,6 +15,10 @@ function basicRemove(collection, object, callback) {
     return false;
 }
 
+function asNamedFunction(name, submission, course) {
+    return 'function code(' + fnParams(submission, course).join() + ") {\n" + submission.code + "\n}";
+}
+
 // helper function to save object
 function basicSave(object, collection, callback) {
     callback = opWrapper(callback, object);
@@ -115,44 +119,27 @@ function beautifyCode(code) {
     return code;
 }
 
+var cacheBust = +new Date();
 function testSubmission(submission, course, fn) {
-    var instance = makeMochaInstance();
-    instance.setup({
-        reporter: "json",
-        ui: "bdd"
-    });
 
-    var localParams = _.partial(fnParams, submission, course);
-
-    function asFunction() {
-        var params = localParams();
-        var header = 'var _ = lodash;';
-        params.push(header + submission.code);
-        return Function.apply({}, params);
+    var jsWorker = new Worker('/resources/js/jsWorker.js?' + cacheBust);
+    jsWorker.onerror = function(event) {
+        throw new Error(event.message + " (" + event.filename + ":" + event.lineno + ")");
+    };
+    jsWorker.onmessage = function(e) {
+        console.log("Received: " + e.data);
     }
-
-    var api = instance.api;
-    api.describe('submission', function() {
-        api.it('is compatible', function() {
-            chai.expect(localParams().length).to.be.equal(getParameters(course).length || 1)
-        });
-        api.it('compiles', function() {
-            var fn = asFunction();
-            chai.expect(fn).to.be.a('function');
-        });
-    });
-
     try {
-        var courseRuntime = new Function('bdd', 'chai', 'fn', course.runtime);
-        courseRuntime.call({}, instance.api, chai, asFunction());
+        jsWorker.postMessage({
+            command: 'run',
+            course: course.runtime,
+            submission: submission.code,
+            parameters: fnParams(submission, course)
+        });
     }
     catch (e) {
-        console.error(e);
+        // TODO Terminate
     }
-
-    instance.jsRun(function(js) {
-        fn(js);
-    });
 }
 
 Accounts.ui.config({
@@ -200,29 +187,10 @@ courseCtrls.controller('CourseEdit', ['$scope', '$stateParams', '$state', withCo
         return fn();
     }));
 
-    var instance = makeMochaInstance();
-    instance.setup({
-        reporter: "json",
-        ui: "bdd"
-    });
-
-    var api = instance.api;
-    api.describe('Course runtime', function() {
-        api.it('compiles', function() {
-            var fn = new Function('bdd', 'chai', 'fn', course.runtime);
-            chai.expect(fn).to.be.a('function');
-        });
-    });
-
     $scope.$watch(function() {
         return course.runtime;
     }, function() {
-        instance.jsRun(function(js) {
-            $scope.$apply(function() {
-                $scope.validation = js;
-                console.log(js);
-            });
-        });
+        
     });
 })]);
 
@@ -238,7 +206,9 @@ function isLoggedIn($scope) {
 
 function loginPrompt() {
     $('#login-dropdown-list').addClass('open');
-    $('html,body').animate({ scrollTop: 0 }, 'slow');
+    $('html,body').animate({
+        scrollTop: 0
+    }, 'slow');
 }
 
 // Course view
@@ -255,7 +225,7 @@ courseCtrls.controller('CourseView', ['$scope', '$stateParams', '$state', '$moda
     $scope.loginPrompt = _.partial(_.defer, loginPrompt);
 
     $scope.toggleMode = function(submission) {
-        var code = 'function code(' + fnParams(submission, course).join() + ") {\n" + submission.code + "\n}";
+        var code = asNamedFunction('code', submission, course);
         switch (submission.displayMode) {
             case 'minified':
                 submission.displayMode = 'code';
@@ -270,7 +240,7 @@ courseCtrls.controller('CourseView', ['$scope', '$stateParams', '$state', '$moda
                 break;
         }
     };
-    
+
     $scope.modeLabel = function(submission) {
         return submission.displayMode == 'code' ? 'Show minified' : 'Show code';
     };

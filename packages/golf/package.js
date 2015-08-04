@@ -11,6 +11,5 @@ Package.onUse(function(api) {
     api.use('ext-libs', 'client');
     api.addFiles('collections.js');
     api.addFiles('server.js', 'server');
-    api.addFiles('testing.js', 'client');
     api.addFiles('main.js', 'client');
 });
